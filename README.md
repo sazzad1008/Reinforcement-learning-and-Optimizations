@@ -19,7 +19,7 @@ Open and run:
 
 - `notebooks/rl_algorithms_demo.ipynb`
 
-## Dependency
+## Dependencies
 
 - Python 3.9+
 - `numpy`

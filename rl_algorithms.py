@@ -184,17 +184,18 @@ def ppo(
                 old_action_prob = old_probs[action]
 
                 candidate_logits = logits.copy()
-                candidate_logits[state, action] += learning_rate * advantages[t]
+                grad_log = -old_probs
+                grad_log[action] += 1.0
+                candidate_logits[state] += learning_rate * advantages[t] * grad_log
                 new_probs = _softmax(candidate_logits[state])
                 new_action_prob = new_probs[action]
 
                 ratio = new_action_prob / (old_action_prob + 1e-8)
                 unclipped = ratio * advantages[t]
                 clipped = np.clip(ratio, 1 - clip_epsilon, 1 + clip_epsilon) * advantages[t]
-                chosen_objective = unclipped if unclipped <= clipped else clipped
-
-                grad_log = -old_probs
-                grad_log[action] += 1.0
+                chosen_objective = (
+                    min(unclipped, clipped) if advantages[t] >= 0 else max(unclipped, clipped)
+                )
                 updates[state] += chosen_objective * grad_log
 
         logits += (learning_rate / episodes_per_iter) * updates
@@ -217,8 +218,6 @@ def trpo(
 
     for _ in range(iterations):
         grad = np.zeros_like(logits)
-        kl = np.zeros(mdp.n_states, dtype=float)
-        counts = np.zeros(mdp.n_states, dtype=float)
 
         for _ in range(episodes_per_iter):
             trajectory = _collect_episode(mdp, logits, start_state=0, max_steps=max_steps, rng=rng)
@@ -230,16 +229,13 @@ def trpo(
                 old_probs = _softmax(logits[state])
                 grad_log = -old_probs
                 grad_log[action] += 1.0
-                grad[state] += advantages[t] * grad_log
-
                 proposed = logits[state] + learning_rate * advantages[t] * grad_log
                 new_probs = _softmax(proposed)
-                kl[state] += np.sum(old_probs * (np.log(old_probs + 1e-8) - np.log(new_probs + 1e-8)))
-                counts[state] += 1
+                state_kl = np.sum(old_probs * (np.log(old_probs + 1e-8) - np.log(new_probs + 1e-8)))
+                scaling = min(1.0, np.sqrt(max_kl / (state_kl + 1e-8)))
+                grad[state] += scaling * advantages[t] * grad_log
 
-        mean_kl = np.divide(kl, np.maximum(counts, 1), out=np.zeros_like(kl), where=counts >= 0)
-        scaling = np.minimum(1.0, np.sqrt(max_kl / (mean_kl + 1e-8)))
-        logits += learning_rate * grad * scaling[:, None] / max(episodes_per_iter, 1)
+        logits += learning_rate * grad / max(episodes_per_iter, 1)
 
     return np.argmax(logits, axis=1)
 
