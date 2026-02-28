@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Tuple
 
 import numpy as np
 
@@ -30,7 +29,7 @@ def make_complex_dataset(size: int, feature_dim: int, seed: int) -> ComplexDatas
     return ComplexDataset(features=features, labels=labels)
 
 
-def train_test_split(dataset: ComplexDataset, split_ratio: float) -> Tuple[ComplexDataset, ComplexDataset]:
+def train_test_split(dataset: ComplexDataset, split_ratio: float) -> tuple[ComplexDataset, ComplexDataset]:
     split = int(split_ratio * len(dataset.features))
     return (
         ComplexDataset(dataset.features[:split], dataset.labels[:split]),

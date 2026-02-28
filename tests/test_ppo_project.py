@@ -11,10 +11,10 @@ class PPOProjectTests(unittest.TestCase):
         self.assertEqual(len(train_set.features), 80)
         self.assertEqual(len(test_set.features), 20)
 
-    def test_training_returns_sane_accuracy(self):
-        result = train_ppo(PPOConfig(train_steps=20, dataset_size=256, batch_size=32, update_epochs=2))
-        self.assertGreaterEqual(result.train_accuracy, 0.20)
-        self.assertGreaterEqual(result.test_accuracy, 0.20)
+    def test_training_achieves_baseline_accuracy(self):
+        result = train_ppo(PPOConfig())
+        self.assertGreaterEqual(result.train_accuracy, 0.25)
+        self.assertGreaterEqual(result.test_accuracy, 0.25)
 
 
 if __name__ == "__main__":

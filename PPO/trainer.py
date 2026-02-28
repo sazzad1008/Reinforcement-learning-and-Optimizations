@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Generator
 
 import numpy as np
 
@@ -15,7 +16,7 @@ class TrainResult:
     test_accuracy: float
 
 
-def _batches(size: int, batch_size: int, rng: np.random.Generator) -> np.ndarray:
+def _batches(size: int, batch_size: int, rng: np.random.Generator) -> Generator[np.ndarray, None, None]:
     indices = np.arange(size)
     rng.shuffle(indices)
     for start in range(0, size, batch_size):
@@ -26,6 +27,15 @@ def _one_hot(actions: np.ndarray, n_actions: int) -> np.ndarray:
     encoded = np.zeros((len(actions), n_actions), dtype=float)
     encoded[np.arange(len(actions)), actions] = 1.0
     return encoded
+
+
+def _discounted_returns(rewards: np.ndarray, gamma: float) -> np.ndarray:
+    returns = np.zeros_like(rewards, dtype=float)
+    running = 0.0
+    for i in range(len(rewards) - 1, -1, -1):
+        running = rewards[i] + gamma * running
+        returns[i] = running
+    return returns
 
 
 def _accuracy(model: MLPActorCritic, dataset: ComplexDataset) -> float:
@@ -48,7 +58,7 @@ def train_ppo(config: PPOConfig = PPOConfig()) -> TrainResult:
             hidden, old_probs, old_values = model.forward(states)
             actions = np.array([rng.choice(config.n_actions, p=p) for p in old_probs], dtype=int)
             rewards = np.where(actions == labels, 1.0, -1.0)
-            returns = rewards
+            returns = _discounted_returns(rewards, config.gamma)
             advantages = returns - old_values
             advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
 
@@ -60,9 +70,7 @@ def train_ppo(config: PPOConfig = PPOConfig()) -> TrainResult:
                 selected_new = probs[np.arange(len(actions)), actions]
                 ratio = selected_new / (selected_old + 1e-8)
                 clipped = np.clip(ratio, 1 - config.clip_epsilon, 1 + config.clip_epsilon)
-                chosen_ratio = np.where(advantages >= 0.0, np.minimum(ratio, clipped), np.maximum(ratio, clipped))
-
-                policy_weight = (chosen_ratio * advantages).reshape(-1, 1)
+                policy_weight = np.minimum(ratio * advantages, clipped * advantages).reshape(-1, 1)
                 policy_grad_logits = (probs - action_1h) * policy_weight / len(actions)
 
                 value_error = (values - returns).reshape(-1, 1)
