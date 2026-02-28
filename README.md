@@ -7,6 +7,8 @@ This repository includes runnable reference implementations for:
 - PPO (Proximal Policy Optimization)
 - TRPO (Trust Region Policy Optimization)
 
+A modular, from-scratch PPO project for complex synthetic data is available in `PPO/`.
+
 ## Quick start
 
 ```bash
